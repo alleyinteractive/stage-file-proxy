@@ -44,6 +44,7 @@ if ( stripos( $_SERVER['REQUEST_URI'], '/wp-content/uploads/' ) !== false ) sfp_
  * This function, triggered above, sets the chain in motion.
  */
 function sfp_expect() {
+	ob_start();
 	ini_set( 'display_errors', 'off' );
 	add_action( 'init', 'sfp_dispatch' );
 }
@@ -66,8 +67,10 @@ function sfp_dispatch() {
 		exit;
 	}
 
+	$doing_resize = false;
 	// resize an image maybe
 	if ( preg_match( '/(.+)(-r)?-([0-9]+)x([0-9]+)(c)?\.(jpe?g|png|gif)/iU', $relative_path, $matches ) ) {
+		$doing_resize = true;
 		$resize = array();
 		$resize['filename'] = $matches[1].'.'.$matches[6];
 		$resize['width'] = $matches[3];
@@ -85,8 +88,9 @@ function sfp_dispatch() {
 			$img = wp_get_image_editor( $basefile );
 			$img->resize( $resize['width'], $resize['height'], $resize['crop'] );
 			$info = pathinfo( $basefile );
-			$img->save( $info['dirname'] . '/' . $info['filename'] . '-' . $suffix . '.' .$info['extension'] );
-			header( "Location: {$_SERVER['REQUEST_URI']}" );
+			$path_to_new_file = $info['dirname'] . '/' . $info['filename'] . '-' . $suffix . '.' .$info['extension'];
+			$img->save( $path_to_new_file );
+			sfp_serve_requested_file( $path_to_new_file );
 		}
 		$relative_path = $resize['filename'];
 	}
@@ -115,11 +119,29 @@ function sfp_dispatch() {
 	if ( !$upload['error'] ) {
 		// if there was some other sort of error, and the file now does not exist, we could loop on accident.
 		// should think about some other strategies.
-		header( "Location: {$_SERVER['REQUEST_URI']}" );
-		exit;
+		if ( $doing_resize ) {
+			sfp_dispatch();
+		} else {
+			sfp_serve_requested_file( $upload['file'] );
+		}
 	} else {
 		sfp_error();
 	}
+}
+
+/**
+ * Serve the file directly.
+ */
+function sfp_serve_requested_file( $filename ) {
+	// find the mime type
+	$finfo = finfo_open( FILEINFO_MIME_TYPE );
+	$type = finfo_file( $finfo, $filename );
+	// serve the image this one time (next time the webserver will do it for us)
+	ob_end_clean();
+	header( 'Content-Type: '. $type );
+	header( 'Content-Length: ' . filesize( $filename ) );
+	readfile( $filename );
+	exit;
 }
 
 /**
