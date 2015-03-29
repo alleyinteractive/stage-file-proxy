@@ -22,6 +22,8 @@
  * See: http://wordpress.org/plugins/dynamic-image-resizer/
  */
 
+require_once( dirname( __FILE__ ) . '/admin.php' );
+
 /**
  * Load SFP before anything else so we can shut up any other plugins' warnings.
  * @see http://wordpress.org/support/topic/how-to-change-plugins-load-order
