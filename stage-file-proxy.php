@@ -61,7 +61,6 @@ function sfp_expect() {
 function sfp_dispatch() {
 	$mode = sfp_get_mode();
 	$relative_path = sfp_get_relative_path();
-	xdebug_break();
 	if ( 'header' === $mode ) {
 		header( "Location: " . sfp_get_base_url() . $relative_path );
 		exit;
@@ -79,11 +78,8 @@ function sfp_dispatch() {
 		$resize['mode'] = substr( $matches[2], 1 );
 
 		if ( 'local' === $mode ) {
-			xdebug_break();
-			// check cache for request hash
-
+			// TODO: check for existing request hash in transient
 			$basefile = sfp_get_random_local_file_path();
-
 		} else {
 			$uploads_dir = wp_upload_dir();
 			$basefile = $uploads_dir['basedir'] . '/' . $resize['filename'];
@@ -212,6 +208,9 @@ function sfp_get_relative_path() {
 	return $path;
 }
 
+/**
+ * Grab a random file from a local directory and return the path
+ */
 function sfp_get_random_local_file_path() {
 	static $local_dir;
 	if ( !$local_dir ) {
