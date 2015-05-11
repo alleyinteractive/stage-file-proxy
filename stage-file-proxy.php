@@ -61,7 +61,7 @@ function sfp_expect() {
 function sfp_dispatch() {
 	$mode = sfp_get_mode();
 	$relative_path = sfp_get_relative_path();
-
+	xdebug_break();
 	if ( 'header' === $mode ) {
 		header( "Location: " . sfp_get_base_url() . $relative_path );
 		exit;
@@ -77,9 +77,17 @@ function sfp_dispatch() {
 		$resize['height'] = $matches[4];
 		$resize['crop'] = !empty( $matches[5] );
 		$resize['mode'] = substr( $matches[2], 1 );
-		$uploads_dir = wp_upload_dir();
 
-		$basefile = $uploads_dir['basedir'] . '/' . $resize['filename'];
+		if ( 'local' === $mode ) {
+			xdebug_break();
+			// check cache for request hash
+
+			$basefile = sfp_get_random_local_file_path();
+
+		} else {
+			$uploads_dir = wp_upload_dir();
+			$basefile = $uploads_dir['basedir'] . '/' . $resize['filename'];
+		}
 	
 		if ( file_exists( $basefile ) ) {
 			$suffix = $resize['width'] . 'x' . $resize['height'];
@@ -202,6 +210,24 @@ function sfp_get_relative_path() {
 		$path = preg_replace( '/.*\/wp\-content\/uploads(\/sites\/\d+)?\//i', '', $_SERVER['REQUEST_URI'] );
 	}
 	return $path;
+}
+
+function sfp_get_random_local_file_path() {
+	static $local_dir;
+	if ( !$local_dir ) {
+		$local_dir = get_option( 'sfp_local_dir' );
+		if ( !$local_dir ) $local_dir = 'sfp-images';
+	}
+
+	$replacement_image_path = get_template_directory() . '/' . $local_dir . '/';
+	$images = array();
+
+	foreach ( glob( $replacement_image_path . '*' ) as $filename ) {
+		$images[] = basename( $filename );
+	}
+	$count = count( $images );
+	$rand = rand( 0, $count - 1 );
+	return $replacement_image_path . $images[$rand];
 }
 
 /**
