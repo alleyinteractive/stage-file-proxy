@@ -90,10 +90,8 @@ function sfp_dispatch() {
 	$remote_request = wp_remote_get( $remote_url, array( 'timeout' => 30 ) );
 
 	if ( is_wp_error( $remote_request ) || $remote_request['response']['code'] > 400 ) {
-
 		// If local mode, failover to local files
 		if ( 'local' === $mode ) {
-
 			// Cache replacement image by hashed request URI
 			$transient_key = hash( 'md5', 'sfp_image_' . $_SERVER['REQUEST_URI'] );
 			if ( false === ( $basefile = get_transient( $transient_key ) ) ) {
@@ -107,21 +105,25 @@ function sfp_dispatch() {
 			} else {
 				sfp_serve_requested_file( $basefile );
 			}
-		} else sfp_error();
+		} else {
+			sfp_error();
+		}
 	}
 
 	// we could be making some dangerous assumptions here, but if WP is setup normally, this will work:
 	$path_parts = explode( '/', $remote_url );
 	$name = array_pop( $path_parts );
 
-	if ( strpos( $name, '?' ) ) list( $name, $crap ) = explode( '?', $name, 2 );
+	if ( strpos( $name, '?' ) ) {
+		list( $name, $crap ) = explode( '?', $name, 2 );
+	}
 
 	$month = array_pop( $path_parts );
 	$year = array_pop( $path_parts );
 
 	$upload = wp_upload_bits( $name, null, $remote_request['body'], "$year/$month" );
 
-	if ( !$upload['error'] ) {
+	if ( ! $upload['error'] ) {
 		// if there was some other sort of error, and the file now does not exist, we could loop on accident.
 		// should think about some other strategies.
 		if ( $doing_resize ) {
@@ -140,8 +142,12 @@ function sfp_dispatch() {
 function sfp_resize_image( $basefile, $resize ) {
 	if ( file_exists( $basefile ) ) {
 		$suffix = $resize['width'] . 'x' . $resize['height'];
-		if ( $resize['crop'] ) $suffix .= 'c';
-		if ( 'r' == $resize['mode'] ) $suffix = 'r-' . $suffix;
+		if ( $resize['crop'] ) {
+			$suffix .= 'c';
+		}
+		if ( 'r' == $resize['mode'] ) {
+			$suffix = 'r-' . $suffix;
+		}
 		$img = wp_get_image_editor( $basefile );
 		$img->resize( $resize['width'], $resize['height'], $resize['crop'] );
 		$info = pathinfo( $basefile );
