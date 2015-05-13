@@ -90,12 +90,18 @@ function sfp_dispatch() {
 	$remote_request = wp_remote_get( $remote_url, array( 'timeout' => 30 ) );
 
 	if ( is_wp_error( $remote_request ) || $remote_request['response']['code'] > 400 ) {
+
+		// If local mode, failover to local files
 		if ( 'local' === $mode ) {
+
+			// Cache replacement image by hashed request URI
 			$transient_key = hash( 'md5', 'sfp_image_' . $_SERVER['REQUEST_URI'] );
 			if ( false === ( $basefile = get_transient( $transient_key ) ) ) {
 				$basefile = sfp_get_random_local_file_path( $doing_resize );
 				set_transient( $transient_key, $basefile );
 			}
+
+			// Resize if necessary
 			if ( $doing_resize ) {
 				sfp_resize_image( $basefile, $resize );
 			} else {
@@ -128,6 +134,9 @@ function sfp_dispatch() {
 	}
 }
 
+/**
+ * Resizes $basefile based on paramters in $resize
+ */
 function sfp_resize_image( $basefile, $resize ) {
 	if ( file_exists( $basefile ) ) {
 		$suffix = $resize['width'] . 'x' . $resize['height'];
@@ -230,10 +239,10 @@ function sfp_get_random_local_file_path( $doing_resize ) {
 
 	$replacement_image_path = get_template_directory() . '/' . $local_dir . '/';
 
-	$images = array();
-
+	// Cache image directory contents
 	if ( false === ( $images = get_transient( $transient_key ) ) ) {
 		foreach ( glob( $replacement_image_path . '*' ) as $filename ) {
+
 			// Exclude resized images
 			if ( !preg_match( '/.+[0-9]+x[0-9]+c?\.(jpe?g|png|gif)/iU', $filename ) ) {
 				$images[] = basename( $filename );
@@ -242,8 +251,7 @@ function sfp_get_random_local_file_path( $doing_resize ) {
 		set_transient( $transient_key, $images );
 	}
 
-	$count = count( $images );
-	$rand = rand( 0, $count - 1 );
+	$rand = rand( 0, count( $images ) - 1 );
 	return $replacement_image_path . $images[$rand];
 }
 
