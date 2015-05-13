@@ -79,7 +79,6 @@ function sfp_dispatch() {
 
 		$uploads_dir = wp_upload_dir();
 		$basefile = $uploads_dir['basedir'] . '/' . $resize['filename'];
-
 		sfp_resize_image( $basefile, $resize );
 		$relative_path = $resize['filename'];
 	}
@@ -92,15 +91,15 @@ function sfp_dispatch() {
 
 	if ( is_wp_error( $remote_request ) || $remote_request['response']['code'] > 400 ) {
 		if ( 'local' === $mode ) {
-			$transient_key = hash( 'md5', 'sfp_image' . $_SERVER['REQUEST_URI'] );
+			$transient_key = hash( 'md5', 'sfp_image_' . $_SERVER['REQUEST_URI'] );
 			if ( false === ( $basefile = get_transient( $transient_key ) ) ) {
 				$basefile = sfp_get_random_local_file_path( $doing_resize );
-				if ( $doing_resize ) {
-					sfp_resize_image( $basefile, $resize );
-				} else {
-					sfp_serve_requested_file( $basefile );
-				}
 				set_transient( $transient_key, $basefile );
+			}
+			if ( $doing_resize ) {
+				sfp_resize_image( $basefile, $resize );
+			} else {
+				sfp_serve_requested_file( $basefile );
 			}
 		} else sfp_error();
 	}
