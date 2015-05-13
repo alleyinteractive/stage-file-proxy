@@ -232,9 +232,11 @@ function sfp_get_relative_path() {
 function sfp_get_random_local_file_path( $doing_resize ) {
 	static $local_dir;
 	$transient_key = 'sfp-replacement-images';
-	if ( !$local_dir ) {
+	if ( ! $local_dir ) {
 		$local_dir = get_option( 'sfp_local_dir' );
-		if ( !$local_dir ) $local_dir = 'sfp-images';
+		if ( ! $local_dir ) {
+			$local_dir = 'sfp-images';
+		}
 	}
 
 	$replacement_image_path = get_template_directory() . '/' . $local_dir . '/';
@@ -242,9 +244,8 @@ function sfp_get_random_local_file_path( $doing_resize ) {
 	// Cache image directory contents
 	if ( false === ( $images = get_transient( $transient_key ) ) ) {
 		foreach ( glob( $replacement_image_path . '*' ) as $filename ) {
-
 			// Exclude resized images
-			if ( !preg_match( '/.+[0-9]+x[0-9]+c?\.(jpe?g|png|gif)/iU', $filename ) ) {
+			if ( ! preg_match( '/.+[0-9]+x[0-9]+c?\.(jpe?g|png|gif)$/iU', $filename ) ) {
 				$images[] = basename( $filename );
 			}
 		}
@@ -252,7 +253,7 @@ function sfp_get_random_local_file_path( $doing_resize ) {
 	}
 
 	$rand = rand( 0, count( $images ) - 1 );
-	return $replacement_image_path . $images[$rand];
+	return $replacement_image_path . $images[ $rand ];
 }
 
 /**
@@ -260,9 +261,11 @@ function sfp_get_random_local_file_path( $doing_resize ) {
  */
 function sfp_get_mode() {
 	static $mode;
-	if ( !$mode ) {
+	if ( ! $mode ) {
 		$mode = get_option( 'sfp_mode' );
-		if ( !$mode ) $mode = 'header';
+		if ( ! $mode ) {
+			$mode = 'header';
+		}
 	}
 	return $mode;
 }
@@ -273,9 +276,11 @@ function sfp_get_mode() {
 function sfp_get_base_url() {
 	static $url;
 	$mode = sfp_get_mode();
-	if ( !$url ) {
+	if ( ! $url ) {
 		$url = get_option( 'sfp_url' );
-		if ( !$url && 'local' !== $mode ) sfp_error();
+		if ( ! $url && 'local' !== $mode ) {
+			sfp_error();
+		}
 	}
 	return $url;
 }
