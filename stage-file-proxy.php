@@ -61,7 +61,6 @@ function sfp_expect() {
 function sfp_dispatch() {
 	$mode = sfp_get_mode();
 	$relative_path = sfp_get_relative_path();
-
 	if ( 'header' === $mode ) {
 		header( "Location: " . sfp_get_base_url() . $relative_path );
 		exit;
@@ -77,21 +76,10 @@ function sfp_dispatch() {
 		$resize['height'] = $matches[4];
 		$resize['crop'] = !empty( $matches[5] );
 		$resize['mode'] = substr( $matches[2], 1 );
-		$uploads_dir = wp_upload_dir();
 
+		$uploads_dir = wp_upload_dir();
 		$basefile = $uploads_dir['basedir'] . '/' . $resize['filename'];
-	
-		if ( file_exists( $basefile ) ) {
-			$suffix = $resize['width'] . 'x' . $resize['height'];
-			if ( $resize['crop'] ) $suffix .= 'c';
-			if ( 'r' == $resize['mode'] ) $suffix = 'r-' . $suffix;
-			$img = wp_get_image_editor( $basefile );
-			$img->resize( $resize['width'], $resize['height'], $resize['crop'] );
-			$info = pathinfo( $basefile );
-			$path_to_new_file = $info['dirname'] . '/' . $info['filename'] . '-' . $suffix . '.' .$info['extension'];
-			$img->save( $path_to_new_file );
-			sfp_serve_requested_file( $path_to_new_file );
-		}
+		sfp_resize_image( $basefile, $resize );
 		$relative_path = $resize['filename'];
 	}
 
@@ -102,7 +90,24 @@ function sfp_dispatch() {
 	$remote_request = wp_remote_get( $remote_url, array( 'timeout' => 30 ) );
 
 	if ( is_wp_error( $remote_request ) || $remote_request['response']['code'] > 400 ) {
-		sfp_error();
+
+		// If local mode, failover to local files
+		if ( 'local' === $mode ) {
+
+			// Cache replacement image by hashed request URI
+			$transient_key = hash( 'md5', 'sfp_image_' . $_SERVER['REQUEST_URI'] );
+			if ( false === ( $basefile = get_transient( $transient_key ) ) ) {
+				$basefile = sfp_get_random_local_file_path( $doing_resize );
+				set_transient( $transient_key, $basefile );
+			}
+
+			// Resize if necessary
+			if ( $doing_resize ) {
+				sfp_resize_image( $basefile, $resize );
+			} else {
+				sfp_serve_requested_file( $basefile );
+			}
+		} else sfp_error();
 	}
 
 	// we could be making some dangerous assumptions here, but if WP is setup normally, this will work:
@@ -126,6 +131,23 @@ function sfp_dispatch() {
 		}
 	} else {
 		sfp_error();
+	}
+}
+
+/**
+ * Resizes $basefile based on parameters in $resize
+ */
+function sfp_resize_image( $basefile, $resize ) {
+	if ( file_exists( $basefile ) ) {
+		$suffix = $resize['width'] . 'x' . $resize['height'];
+		if ( $resize['crop'] ) $suffix .= 'c';
+		if ( 'r' == $resize['mode'] ) $suffix = 'r-' . $suffix;
+		$img = wp_get_image_editor( $basefile );
+		$img->resize( $resize['width'], $resize['height'], $resize['crop'] );
+		$info = pathinfo( $basefile );
+		$path_to_new_file = $info['dirname'] . '/' . $info['filename'] . '-' . $suffix . '.' .$info['extension'];
+		$img->save( $path_to_new_file );
+		sfp_serve_requested_file( $path_to_new_file );
 	}
 }
 
@@ -205,6 +227,35 @@ function sfp_get_relative_path() {
 }
 
 /**
+ * Grab a random file from a local directory and return the path
+ */
+function sfp_get_random_local_file_path( $doing_resize ) {
+	static $local_dir;
+	$transient_key = 'sfp-replacement-images';
+	if ( !$local_dir ) {
+		$local_dir = get_option( 'sfp_local_dir' );
+		if ( !$local_dir ) $local_dir = 'sfp-images';
+	}
+
+	$replacement_image_path = get_template_directory() . '/' . $local_dir . '/';
+
+	// Cache image directory contents
+	if ( false === ( $images = get_transient( $transient_key ) ) ) {
+		foreach ( glob( $replacement_image_path . '*' ) as $filename ) {
+
+			// Exclude resized images
+			if ( !preg_match( '/.+[0-9]+x[0-9]+c?\.(jpe?g|png|gif)/iU', $filename ) ) {
+				$images[] = basename( $filename );
+			}
+		}
+		set_transient( $transient_key, $images );
+	}
+
+	$rand = rand( 0, count( $images ) - 1 );
+	return $replacement_image_path . $images[$rand];
+}
+
+/**
  * SFP can operate in two modes, 'download' and 'header'
  */
 function sfp_get_mode() {
@@ -221,9 +272,10 @@ function sfp_get_mode() {
  */
 function sfp_get_base_url() {
 	static $url;
+	$mode = sfp_get_mode();
 	if ( !$url ) {
 		$url = get_option( 'sfp_url' );
-		if ( !$url ) sfp_error();
+		if ( !$url && 'local' !== $mode ) sfp_error();
 	}
 	return $url;
 }
