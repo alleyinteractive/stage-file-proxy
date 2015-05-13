@@ -135,7 +135,7 @@ function sfp_dispatch() {
 }
 
 /**
- * Resizes $basefile based on paramters in $resize
+ * Resizes $basefile based on parameters in $resize
  */
 function sfp_resize_image( $basefile, $resize ) {
 	if ( file_exists( $basefile ) ) {
