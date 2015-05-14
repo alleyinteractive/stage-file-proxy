@@ -93,7 +93,7 @@ function sfp_dispatch() {
 		// If local mode, failover to local files
 		if ( 'local' === $mode ) {
 			// Cache replacement image by hashed request URI
-			$transient_key = hash( 'md5', 'sfp_image_' . $_SERVER['REQUEST_URI'] );
+			$transient_key = 'sfp_image_' . md5( $_SERVER['REQUEST_URI'] );
 			if ( false === ( $basefile = get_transient( $transient_key ) ) ) {
 				$basefile = sfp_get_random_local_file_path( $doing_resize );
 				set_transient( $transient_key, $basefile );
