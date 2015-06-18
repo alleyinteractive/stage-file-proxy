@@ -105,6 +105,9 @@ function sfp_dispatch() {
 			} else {
 				sfp_serve_requested_file( $basefile );
 			}
+		} elseif ( 'lorempixel' === $mode ) {
+			header( 'Location: http://lorempixel.com/' . $resize['width'] . '/' . $resize['height'] );
+			exit;
 		} else {
 			sfp_error();
 		}
