@@ -93,6 +93,9 @@ function sfp_dispatch() {
 		$basefile = $uploads_dir['basedir'] . '/' . $resize['filename'];
 		sfp_resize_image( $basefile, $resize );
 		$relative_path = $resize['filename'];
+	} else if ( 'photon' === $mode ) {
+		header( "Location: " . sfp_get_base_url() . $relative_path );
+		exit;
 	}
 
 	// Download a full-size original from the remote server.
