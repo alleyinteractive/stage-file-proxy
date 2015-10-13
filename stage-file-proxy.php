@@ -15,7 +15,7 @@
  * We're also going to *assume* that if a request for /wp-content/uploads/ causes PHP to load, it's
  * going to be a 404 and we should go and get it from the remote server.
  *
- * Developers need to know that this stuff is happening and should generally understand how this plugin 
+ * Developers need to know that this stuff is happening and should generally understand how this plugin
  * works before they employ it.
  *
  * The dynamic resizing portion was adapted from dynamic-image-resizer.
@@ -77,16 +77,31 @@ function sfp_dispatch() {
 		$resize['crop'] = !empty( $matches[5] );
 		$resize['mode'] = substr( $matches[2], 1 );
 
+		if ( 'photon' === $mode ) {
+			header( 'Location: ' . add_query_arg(
+				array(
+					'w' => $resize['width'],
+					'h' => $resize['height'],
+					'resize' => $resize['crop'] ? "{$resize['width']},{$resize['height']}" : null,
+				),
+				sfp_get_base_url() . $resize['filename']
+			) );
+			exit;
+		}
+
 		$uploads_dir = wp_upload_dir();
 		$basefile = $uploads_dir['basedir'] . '/' . $resize['filename'];
 		sfp_resize_image( $basefile, $resize );
 		$relative_path = $resize['filename'];
+	} else if ( 'photon' === $mode ) {
+		header( "Location: " . sfp_get_base_url() . $relative_path );
+		exit;
 	}
 
 	// Download a full-size original from the remote server.
 	// If it needs to be resized, it will be on the next load.
 	$remote_url = sfp_get_base_url() . $relative_path;
-	
+
 	$remote_request = wp_remote_get( $remote_url, array( 'timeout' => 30 ) );
 
 	if ( is_wp_error( $remote_request ) || $remote_request['response']['code'] > 400 ) {
@@ -182,7 +197,7 @@ function sfp_serve_requested_file( $filename ) {
  */
 function sfp_image_sizes_advanced( $sizes ) {
 	global $dynimg_image_sizes;
-	
+
 	// save the sizes to a global, because the next function needs them to lie to WP about what sizes were generated
 	$dynimg_image_sizes = $sizes;
 
@@ -196,7 +211,7 @@ add_filter( 'intermediate_image_sizes_advanced', 'sfp_image_sizes_advanced' );
  */
 function sfp_generate_metadata( $meta ) {
 	global $dynimg_image_sizes;
-	
+
 	if ( !is_array( $dynimg_image_sizes ) ) return;
 
 	foreach ($dynimg_image_sizes as $sizename => $size) {
@@ -221,7 +236,7 @@ function sfp_generate_metadata( $meta ) {
 			$meta['sizes'][$sizename] = $resized;
 		}
 	}
-	
+
 	return $meta;
 }
 add_filter( 'wp_generate_attachment_metadata', 'sfp_generate_metadata' );
