@@ -102,7 +102,15 @@ function sfp_dispatch() {
 	// If it needs to be resized, it will be on the next load.
 	$remote_url = sfp_get_base_url() . $relative_path;
 
-	$remote_request = wp_remote_get( $remote_url, array( 'timeout' => 30 ) );
+	/**
+	 * Filter: sfp_http_request_args
+	 *
+	 * Alter the args of the GET request.
+	 *
+	 * @param array $remote_http_request_args The request arguments.
+	 */
+	$remote_http_request_args = apply_filters( 'sfp_http_remote_args', array( 'timeout' => 30 ) );
+	$remote_request = wp_remote_get( $remote_url, $remote_http_request_args );
 
 	if ( is_wp_error( $remote_request ) || $remote_request['response']['code'] > 400 ) {
 		// If local mode, failover to local files
