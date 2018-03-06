@@ -257,6 +257,14 @@ function sfp_get_relative_path() {
 	if ( !$path ) {
 		$path = preg_replace( '/.*\/wp\-content\/uploads(\/sites\/\d+)?\//i', '', $_SERVER['REQUEST_URI'] );
 	}
+	/**
+	 * Filter: sfp_relative_path
+	 *
+	 * Alter the relative path of an image in SFP.
+	 *
+	 * @param string $path The relative path of the file.
+	 */
+	$path = apply_filters( 'sfp_relative_path', $path );
 	return $path;
 }
 
