@@ -38,10 +38,7 @@ function sfp_first() {
 }
 add_action( 'activated_plugin', 'sfp_first' );
 
-// @todo is 'init' early enough?
-add_action( 'init', function() {
-	if ( stripos( $_SERVER['REQUEST_URI'], apply_filters( 'sfp_expect_request_uri', '/wp-content/uploads/' ) ) !== false ) sfp_expect();
-} );
+if ( stripos( $_SERVER['REQUEST_URI'], get_option( 'sfp_uri_replace', '/wp-content/uploads/' ) ) !== false ) sfp_expect();
 
 /**
  * This function, triggered above, sets the chain in motion.
