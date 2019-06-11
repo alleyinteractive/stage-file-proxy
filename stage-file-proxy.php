@@ -220,7 +220,9 @@ add_filter( 'intermediate_image_sizes_advanced', 'sfp_image_sizes_advanced' );
 function sfp_generate_metadata( $meta ) {
 	global $dynimg_image_sizes;
 
-	if ( !is_array( $dynimg_image_sizes ) ) return;
+	if ( ! is_array( $dynimg_image_sizes ) ) {
+		return $meta;
+	}
 
 	foreach ($dynimg_image_sizes as $sizename => $size) {
 		// figure out what size WP would make this:
