@@ -3,7 +3,7 @@
 	Plugin Name: Stage File Proxy
 	Plugin URI: http://alleyinteractive.com/
 	Description: Get only the files you need from your production environment. Don't ever run this in production!
-	Version: 0.1
+	Version: 1000
 	Author: Austin Smith, Alley Interactive
 	Author URI: http://www.alleyinteractive.com/
 */
@@ -15,7 +15,7 @@
  * We're also going to *assume* that if a request for /wp-content/uploads/ causes PHP to load, it's
  * going to be a 404 and we should go and get it from the remote server.
  *
- * Developers need to know that this stuff is happening and should generally understand how this plugin 
+ * Developers need to know that this stuff is happening and should generally understand how this plugin
  * works before they employ it.
  *
  * The dynamic resizing portion was adapted from dynamic-image-resizer.
@@ -65,7 +65,7 @@ function sfp_dispatch() {
 	$relative_path = sfp_get_relative_path();
 
 	if ( 'header' === $mode ) {
-		header( "Location: " . sfp_get_base_url() . $relative_path );
+		header( "Location: " . sfp_get_url( $relative_path ) );
 		exit;
 	}
 
@@ -82,7 +82,7 @@ function sfp_dispatch() {
 		$uploads_dir = wp_upload_dir();
 
 		$basefile = $uploads_dir['basedir'] . '/' . $resize['filename'];
-	
+
 		if ( file_exists( $basefile ) ) {
 			$suffix = $resize['width'] . 'x' . $resize['height'];
 			if ( $resize['crop'] ) $suffix .= 'c';
@@ -99,8 +99,8 @@ function sfp_dispatch() {
 
 	// Download a full-size original from the remote server.
 	// If it needs to be resized, it will be on the next load.
-	$remote_url = sfp_get_base_url() . $relative_path;
-	
+	$remote_url = sfp_get_url( $relative_path );
+
 	$remote_request = wp_remote_get( $remote_url, array( 'timeout' => 30 ) );
 
 	if ( is_wp_error( $remote_request ) || $remote_request['response']['code'] > 400 ) {
@@ -151,7 +151,7 @@ function sfp_serve_requested_file( $filename ) {
  */
 function sfp_image_sizes_advanced( $sizes ) {
 	global $dynimg_image_sizes;
-	
+
 	// save the sizes to a global, because the next function needs them to lie to WP about what sizes were generated
 	$dynimg_image_sizes = $sizes;
 
@@ -165,7 +165,7 @@ add_filter( 'intermediate_image_sizes_advanced', 'sfp_image_sizes_advanced' );
  */
 function sfp_generate_metadata( $meta ) {
 	global $dynimg_image_sizes;
-	
+
 	if ( !is_array( $dynimg_image_sizes ) ) return;
 
 	foreach ($dynimg_image_sizes as $sizename => $size) {
@@ -190,7 +190,7 @@ function sfp_generate_metadata( $meta ) {
 			$meta['sizes'][$sizename] = $resized;
 		}
 	}
-	
+
 	return $meta;
 }
 add_filter( 'wp_generate_attachment_metadata', 'sfp_generate_metadata' );
@@ -225,11 +225,23 @@ function sfp_get_base_url() {
 	static $url;
 	if ( !$url ) {
 		$url = get_option( 'sfp_url' );
-		if ( !$url ) sfp_error();
+		if ( ! $url ) sfp_error();
 	}
-	return $url;
+	return trailingslashit( $url );
+}
+
+function sfp_get_url( $path = null ) {
+	if ( ! $path ) {
+		$path = sfp_get_relative_path();
+	}
+
+	return sfp_get_base_url() . $path;
 }
 
 function sfp_error() {
 	die( 'SFP tried to load, but encountered an error' );
+}
+
+if ( 'header' == sfp_get_mode() ) {
+	require_once( dirname( __FILE__ ) . '/content-filters.php' );
 }
