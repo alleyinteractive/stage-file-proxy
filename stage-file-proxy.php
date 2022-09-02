@@ -3,7 +3,7 @@
 	Plugin Name: Stage File Proxy
 	Plugin URI: http://alleyinteractive.com/
 	Description: Get only the files you need from your production environment. Don't ever run this in production!
-	Version: 100
+	Version: 1.1.0
 	Author: Austin Smith, Alley Interactive
 	Author URI: http://www.alleyinteractive.com/
 */
@@ -22,28 +22,35 @@
  * See: http://wordpress.org/plugins/dynamic-image-resizer/
  */
 
+add_action( 'activated_plugin', 'sfp_first' );
+
+// @todo: should this be gated on sfp_dispatch()?
+add_filter( 'wp_generate_attachment_metadata', 'sfp_generate_metadata' );
+
+if ( stripos( $_SERVER['REQUEST_URI'], '/wp-content/uploads/' ) !== false ) {
+	sfp_expect();
+}
+
 /**
- * Load SFP before anything else so we can shut up any other plugins' warnings.
+ * Load SFP before anything else to silence other plugins' warnings.
  * @see http://wordpress.org/support/topic/how-to-change-plugins-load-order
  */
-function sfp_first() {
-	$plugin_path = 'stage-file-proxy/stage-file-proxy.php';
+function sfp_first(): void {
+	$plugin_path    = 'stage-file-proxy/stage-file-proxy.php';
 	$active_plugins = get_option( 'active_plugins' );
-	$plugin_key = array_search( $plugin_path, $active_plugins );
+	$plugin_key     = array_search( $plugin_path, $active_plugins );
 	if ( $plugin_key ) { // if it's 0 it's the first plugin already, no need to continue
 		array_splice( $active_plugins, $plugin_key, 1 );
 		array_unshift( $active_plugins, $plugin_path );
 		update_option( 'active_plugins', $active_plugins );
 	}
 }
-add_action( 'activated_plugin', 'sfp_first' );
 
-if ( stripos( $_SERVER['REQUEST_URI'], '/wp-content/uploads/' ) !== false ) sfp_expect();
 
 /**
  * This function, triggered above, sets the chain in motion.
  */
-function sfp_expect() {
+function sfp_expect(): void {
 	ob_start();
 	ini_set( 'display_errors', 'off' );
 	add_action( 'init', 'sfp_dispatch' );
@@ -58,43 +65,45 @@ function sfp_expect() {
  *
  * Ideally we could do this in one pass.
  */
-function sfp_dispatch() {
-	$mode = sfp_get_mode();
+function sfp_dispatch(): void {
+	$mode          = sfp_get_mode();
 	$relative_path = sfp_get_relative_path();
 	if ( 'header' === $mode ) {
-		header( "Location: " . sfp_get_base_url() . $relative_path );
+		header( 'Location: ' . sfp_get_base_url() . $relative_path );
 		exit;
 	}
 
 	$doing_resize = false;
 	// resize an image maybe
 	if ( preg_match( '/(.+)(-r)?-([0-9]+)x([0-9]+)(c)?\.(jpe?g|png|gif)/iU', $relative_path, $matches ) ) {
-		$doing_resize = true;
-		$resize = array();
-		$resize['filename'] = $matches[1].'.'.$matches[6];
-		$resize['width'] = $matches[3];
-		$resize['height'] = $matches[4];
-		$resize['crop'] = !empty( $matches[5] );
-		$resize['mode'] = substr( $matches[2], 1 );
+		$doing_resize       = true;
+		$resize             = array();
+		$resize['filename'] = $matches[1] . '.' . $matches[6];
+		$resize['width']    = $matches[3];
+		$resize['height']   = $matches[4];
+		$resize['crop']     = ! empty( $matches[5] );
+		$resize['mode']     = substr( $matches[2], 1 );
 
 		if ( 'photon' === $mode ) {
-			header( 'Location: ' . add_query_arg(
-				array(
-					'w' => $resize['width'],
-					'h' => $resize['height'],
-					'resize' => $resize['crop'] ? "{$resize['width']},{$resize['height']}" : null,
-				),
-				sfp_get_base_url() . $resize['filename']
-			) );
+			header(
+				'Location: ' . add_query_arg(
+					array(
+						'w'      => $resize['width'],
+						'h'      => $resize['height'],
+						'resize' => $resize['crop'] ? "{$resize['width']},{$resize['height']}" : null,
+					),
+					sfp_get_base_url() . $resize['filename']
+				)
+			);
 			exit;
 		}
 
 		$uploads_dir = wp_upload_dir();
-		$basefile = $uploads_dir['basedir'] . '/' . $resize['filename'];
+		$basefile    = $uploads_dir['basedir'] . '/' . $resize['filename'];
 		sfp_resize_image( $basefile, $resize );
 		$relative_path = $resize['filename'];
-	} else if ( 'photon' === $mode ) {
-		header( "Location: " . sfp_get_base_url() . $relative_path );
+	} elseif ( 'photon' === $mode ) {
+		header( 'Location: ' . sfp_get_base_url() . $relative_path );
 		exit;
 	}
 
@@ -110,7 +119,7 @@ function sfp_dispatch() {
 	 * @param array $remote_http_request_args The request arguments.
 	 */
 	$remote_http_request_args = apply_filters( 'sfp_http_remote_args', array( 'timeout' => 30 ) );
-	$remote_request = wp_remote_get( $remote_url, $remote_http_request_args );
+	$remote_request           = wp_remote_get( $remote_url, $remote_http_request_args );
 
 	if ( is_wp_error( $remote_request ) || $remote_request['response']['code'] > 400 ) {
 		// If local mode, failover to local files
@@ -129,7 +138,7 @@ function sfp_dispatch() {
 				sfp_serve_requested_file( $basefile );
 			}
 		} elseif ( 'lorempixel' === $mode ) {
-			$width = $doing_resize && ! empty( $resize['width'] ) ? $resize['width'] : 800;
+			$width  = $doing_resize && ! empty( $resize['width'] ) ? $resize['width'] : 800;
 			$height = $doing_resize && ! empty( $resize['height'] ) ? $resize['height'] : 600;
 			header( 'Location: http://lorempixel.com/' . $resize['width'] . '/' . $resize['height'] );
 			exit;
@@ -140,14 +149,14 @@ function sfp_dispatch() {
 
 	// we could be making some dangerous assumptions here, but if WP is setup normally, this will work:
 	$path_parts = explode( '/', $remote_url );
-	$name = array_pop( $path_parts );
+	$name       = array_pop( $path_parts );
 
 	if ( strpos( $name, '?' ) ) {
 		list( $name, $crap ) = explode( '?', $name, 2 );
 	}
 
 	$month = array_pop( $path_parts );
-	$year = array_pop( $path_parts );
+	$year  = array_pop( $path_parts );
 
 	$upload = wp_upload_bits( $name, null, $remote_request['body'], "$year/$month" );
 
@@ -166,8 +175,13 @@ function sfp_dispatch() {
 
 /**
  * Resizes $basefile based on parameters in $resize
+ *
+ * @param string $basefile
+ * @param array  $resize
+ *
+ * @return void
  */
-function sfp_resize_image( $basefile, $resize ) {
+function sfp_resize_image( string $basefile, array $resize ): void {
 	if ( file_exists( $basefile ) ) {
 		$suffix = $resize['width'] . 'x' . $resize['height'];
 		if ( $resize['crop'] ) {
@@ -178,8 +192,8 @@ function sfp_resize_image( $basefile, $resize ) {
 		}
 		$img = wp_get_image_editor( $basefile );
 		$img->resize( $resize['width'], $resize['height'], $resize['crop'] );
-		$info = pathinfo( $basefile );
-		$path_to_new_file = $info['dirname'] . '/' . $info['filename'] . '-' . $suffix . '.' .$info['extension'];
+		$info             = pathinfo( $basefile );
+		$path_to_new_file = $info['dirname'] . '/' . $info['filename'] . '-' . $suffix . '.' . $info['extension'];
 		$img->save( $path_to_new_file );
 		sfp_serve_requested_file( $path_to_new_file );
 	}
@@ -187,23 +201,31 @@ function sfp_resize_image( $basefile, $resize ) {
 
 /**
  * Serve the file directly.
+ *
+ * @param string $filename
+ *
+ * @return void
  */
-function sfp_serve_requested_file( $filename ) {
+function sfp_serve_requested_file( string $filename ): void {
 	// find the mime type
 	$finfo = finfo_open( FILEINFO_MIME_TYPE );
-	$type = finfo_file( $finfo, $filename );
+	$type  = finfo_file( $finfo, $filename );
 	// serve the image this one time (next time the webserver will do it for us)
 	ob_end_clean();
-	header( 'Content-Type: '. $type );
+	header( 'Content-Type: ' . $type );
 	header( 'Content-Length: ' . filesize( $filename ) );
 	readfile( $filename );
 	exit;
 }
 
 /**
- * prevent WP from generating resized images on upload
+ * Prevent WP from generating resized images on upload. Doesn't seem to be used.
+ *
+ * @param array $sizes
+ *
+ * @return array
  */
-function sfp_image_sizes_advanced( $sizes ) {
+function sfp_image_sizes_advanced( array $sizes ): array {
 	global $dynimg_image_sizes;
 
 	// save the sizes to a global, because the next function needs them to lie to WP about what sizes were generated
@@ -212,51 +234,57 @@ function sfp_image_sizes_advanced( $sizes ) {
 	// force WP to not make sizes by telling it there's no sizes to make
 	return array();
 }
-add_filter( 'intermediate_image_sizes_advanced', 'sfp_image_sizes_advanced' );
 
 /**
  * Trick WP into thinking the images were generated anyways.
+ *
+ * @param array $meta
+ *
+ * @return array
  */
-function sfp_generate_metadata( $meta ) {
+function sfp_generate_metadata( array $meta ): array {
 	global $dynimg_image_sizes;
 
 	if ( ! is_array( $dynimg_image_sizes ) ) {
 		return $meta;
 	}
 
-	foreach ($dynimg_image_sizes as $sizename => $size) {
+	foreach ( $dynimg_image_sizes as $sizename => $size ) {
 		// figure out what size WP would make this:
 		$newsize = image_resize_dimensions( $meta['width'], $meta['height'], $size['width'], $size['height'], $size['crop'] );
 
-		if ($newsize) {
+		if ( $newsize ) {
 			$info = pathinfo( $meta['file'] );
-			$ext = $info['extension'];
+			$ext  = $info['extension'];
 			$name = wp_basename( $meta['file'], ".$ext" );
 
 			$suffix = "r-{$newsize[4]}x{$newsize[5]}";
-			if ( $size['crop'] ) $suffix .='c';
+			if ( $size['crop'] ) {
+				$suffix .= 'c';
+			}
 
 			// build the fake meta entry for the size in question
 			$resized = array(
-				'file' => "{$name}-{$suffix}.{$ext}",
-				'width' => $newsize[4],
+				'file'   => "{$name}-{$suffix}.{$ext}",
+				'width'  => $newsize[4],
 				'height' => $newsize[5],
 			);
 
-			$meta['sizes'][$sizename] = $resized;
+			$meta['sizes'][ $sizename ] = $resized;
 		}
 	}
 
 	return $meta;
 }
-add_filter( 'wp_generate_attachment_metadata', 'sfp_generate_metadata' );
 
 /**
  * Get the relative file path by stripping out the /wp-content/uploads/ business.
+ *
+ * @return string  The relative path.
  */
-function sfp_get_relative_path() {
+function sfp_get_relative_path(): string {
 	static $path;
-	if ( !$path ) {
+	if ( ! $path ) {
 		$path = preg_replace( '/.*\/wp\-content\/uploads(\/sites\/\d+)?\//i', '', $_SERVER['REQUEST_URI'] );
 	}
 	/**
@@ -271,9 +299,13 @@ function sfp_get_relative_path() {
 }
 
 /**
- * Grab a random file from a local directory and return the path
+ * Grab a random file from a local directory and return the path.
+ *
+ * @param bool $doing_resize
+ *
+ * @return string The local path to the file.
  */
-function sfp_get_random_local_file_path( $doing_resize ) {
+function sfp_get_random_local_file_path( bool $doing_resize ): string {
 	static $local_dir;
 	$transient_key = 'sfp-replacement-images';
 	if ( ! $local_dir ) {
@@ -296,14 +328,21 @@ function sfp_get_random_local_file_path( $doing_resize ) {
 		set_transient( $transient_key, $images );
 	}
 
-	$rand = rand( 0, count( $images ) - 1 );
+	$rand = wp_rand( 0, count( $images ) - 1 );
 	return $replacement_image_path . $images[ $rand ];
 }
 
 /**
- * SFP can operate in two modes, 'download' and 'header'
+ * Retrieve the saved mode.SFP can operate in five modes:
+ *   'download'    Download the remote image to your machine
+ *   'header'      Serve the remote file directly without downloading
+ *   'local'       Not sure, but it looks like it uses a local file if the remote get fails
+ *   'photon'      Not sure, but looks like it uses the photos service to dynamically get images at a specific size
+ *   'lorempixel'  Not sure
+ *
+ * @return string The saved mode. Default is 'header'
  */
-function sfp_get_mode() {
+function sfp_get_mode(): string {
 	static $mode;
 	if ( ! $mode ) {
 		$mode = get_option( 'sfp_mode' );
@@ -315,9 +354,11 @@ function sfp_get_mode() {
 }
 
 /**
- * Get the base URL of the uploads directory (i.e. the first possible directory on the remote side that could store a file)
+ * Get the base URL of the uploads/ directory (i.e. the first possible directory on the remote side that could store a file)
+ *
+ * @return string
  */
-function sfp_get_base_url() {
+function sfp_get_base_url(): string {
 	static $url;
 	$mode = sfp_get_mode();
 	if ( ! $url ) {
@@ -329,6 +370,9 @@ function sfp_get_base_url() {
 	return $url;
 }
 
+/**
+ * Die with an error.
+ */
 function sfp_error() {
 	die( 'SFP tried to load, but encountered an error' );
 }
