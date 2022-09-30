@@ -177,6 +177,12 @@ function sfp_resize_image( $basefile, $resize ) {
 			$suffix = 'r-' . $suffix;
 		}
 		$img = wp_get_image_editor( $basefile );
+
+		// wp_get_image_editor can return a WP_Error if the file exists but is corrupted.
+		if ( is_wp_error( $img  ) ) {
+			sfp_error();
+		}
+
 		$img->resize( $resize['width'], $resize['height'], $resize['crop'] );
 		$info = pathinfo( $basefile );
 		$path_to_new_file = $info['dirname'] . '/' . $info['filename'] . '-' . $suffix . '.' .$info['extension'];
