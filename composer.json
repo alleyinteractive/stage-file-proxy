@@ -1,6 +1,6 @@
 {
   "name": "alleyinteractive/stage-file-proxy",
-  "description": "Get only the files you need from your production environment.",
+  "description": "Get only the files you need from your production environment into your WordPress development environment.",
   "type": "wordpress-plugin",
   "license": "GPL-2.0-or-later",
   "authors": [
