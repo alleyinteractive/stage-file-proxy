@@ -1,27 +1,25 @@
-# stage-file-proxy
+# Stage File Proxy
 
 Mirror (or header to) uploaded files from a remote production site on your local development copy. Saves the trouble of downloading a giant uploads directory without sacrificing the images that accompany content.
 
-# Setup
-1. It relies upon WP getting the 404 for a missing media asset, so whatever server you run this on it must not intercept 404.
-2. There is no control panel for this plugin, so options must be set manually. Using WP-CLI for example, it looks like this to set the mode the `header`:
+## Setup
+
+Stage File Proxy runs when WordPress is serving a 404 response for a request to the uploads directory. If your server intercepts these requests instead of passing them to WordPress, the plugin will not work.
+
+There is no UI for the plugin. Options must be set manually, typically using WP-CLI. For example, it looks like this to set the mode to `header`:
 
 ```shell
-$ wp option set sfp_mode header
+wp option update sfp_mode header
 ```
 
+## Available options
 
-## Options
-These are options stored in the WP options table.
+* `sfp_mode`: The method used to retrieve the remote image. Default is `header`. One of:
+  * `download` (downloads the remote file to your machine)
+  * `header` (serves the remote file directly)
+  * `local` (like `download` but serves an image from a directory in the current parent theme if the download fails)
+  * `photon` (like `header` but uses arguments compatible with []() to size the image)
 
-* `sfp_mode`: <br>The method used to retrieve the remote image. One of
-  * `download` <br>Download the remote image to your machine
-  * `header` <br>serve the remote file directly without downloading
-  * `local` <br>Not sure, but it looks like it uses a local file if the remote get fails
-  * `photon`<br>Not sure, but looks like it uses the photos service to dynamically get images at a specific size
-  * `lorempixel` <br> Not sure
+* `sfp_url`: The absolute URL to the uploads directory on the source site.
 
-
-* `sfp_url`<br>the URL to the uploads directory on the source site. The full url, not relative.
-
-* `sfp_local_dir`<br>Not sure, but looks like it's a folder used by this plugin to store files locally for transient/caching purposes
+* `sfp_local_dir`: The name of the directory in the parent theme where images are stored for `local` mode.

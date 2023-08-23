@@ -1,39 +1,36 @@
 <?php
 /*
 	Plugin Name: Stage File Proxy
-	Plugin URI: http://alleyinteractive.com/
+	Plugin URI: https://www.alley.com
 	Description: Get only the files you need from your production environment. Don't ever run this in production!
-	Version: 1.1.0
+	Version: 2023
 	Author: Austin Smith, Alley Interactive
-	Author URI: http://www.alleyinteractive.com/
+	Author URI: https://www.alley.com
 */
 
-/**
+/*
  * A very important mission we have is to shut up all errors on static-looking paths, otherwise errors
  * are going to screw up the header or download & serve process. So this plugin has to execute first.
  *
  * We're also going to *assume* that if a request for /wp-content/uploads/ causes PHP to load, it's
- * going to be a 404 and we should go and get it from the remote server.
+ * going to be a 404, and we should go and get it from the remote server.
  *
  * Developers need to know that this stuff is happening and should generally understand how this plugin
  * works before they employ it.
  *
  * The dynamic resizing portion was adapted from dynamic-image-resizer.
- * See: http://wordpress.org/plugins/dynamic-image-resizer/
+ * See: https://wordpress.org/plugins/dynamic-image-resizer/
  */
-
 add_action( 'activated_plugin', 'sfp_first' );
-
-// @todo: should this be gated on sfp_dispatch()?
-add_filter( 'wp_generate_attachment_metadata', 'sfp_generate_metadata' );
-
 if ( stripos( $_SERVER['REQUEST_URI'], '/wp-content/uploads/' ) !== false ) {
 	sfp_expect();
 }
+add_filter( 'wp_generate_attachment_metadata', 'sfp_generate_metadata' );
+add_filter( 'intermediate_image_sizes_advanced', 'sfp_image_sizes_advanced' );
 
 /**
  * Load SFP before anything else to silence other plugins' warnings.
- * @see http://wordpress.org/support/topic/how-to-change-plugins-load-order
+ * @see https://wordpress.org/support/topic/how-to-change-plugins-load-order
  */
 function sfp_first(): void {
 	$plugin_path    = 'stage-file-proxy/stage-file-proxy.php';
@@ -137,11 +134,6 @@ function sfp_dispatch(): void {
 			} else {
 				sfp_serve_requested_file( $basefile );
 			}
-		} elseif ( 'lorempixel' === $mode ) {
-			$width  = $doing_resize && ! empty( $resize['width'] ) ? $resize['width'] : 800;
-			$height = $doing_resize && ! empty( $resize['height'] ) ? $resize['height'] : 600;
-			header( 'Location: http://lorempixel.com/' . $resize['width'] . '/' . $resize['height'] );
-			exit;
 		} else {
 			sfp_error();
 		}
@@ -176,12 +168,10 @@ function sfp_dispatch(): void {
 /**
  * Resizes $basefile based on parameters in $resize
  *
- * @param string $basefile
- * @param array  $resize
- *
- * @return void
+ * @param string $basefile The path to the file to resize.
+ * @param array  $resize   The resize parameters.
  */
-function sfp_resize_image( string $basefile, array $resize ): void {
+function sfp_resize_image( $basefile, $resize ): void {
 	if ( file_exists( $basefile ) ) {
 		$suffix = $resize['width'] . 'x' . $resize['height'];
 		if ( $resize['crop'] ) {
@@ -208,11 +198,9 @@ function sfp_resize_image( string $basefile, array $resize ): void {
 /**
  * Serve the file directly.
  *
- * @param string $filename
- *
- * @return void
+ * @param string $filename The path to the file to serve.
  */
-function sfp_serve_requested_file( string $filename ): void {
+function sfp_serve_requested_file( $filename ): void {
 	// find the mime type
 	$finfo = finfo_open( FILEINFO_MIME_TYPE );
 	$type  = finfo_file( $finfo, $filename );
@@ -225,13 +213,12 @@ function sfp_serve_requested_file( string $filename ): void {
 }
 
 /**
- * Prevent WP from generating resized images on upload. Doesn't seem to be used.
+ * Prevent WordPress from generating resized images on upload.
  *
- * @param array $sizes
- *
+ * @param array $sizes Associative array of image sizes to be created.
  * @return array
  */
-function sfp_image_sizes_advanced( array $sizes ): array {
+function sfp_image_sizes_advanced( $sizes ): array {
 	global $dynimg_image_sizes;
 
 	// save the sizes to a global, because the next function needs them to lie to WP about what sizes were generated
@@ -244,11 +231,10 @@ function sfp_image_sizes_advanced( array $sizes ): array {
 /**
  * Trick WP into thinking the images were generated anyways.
  *
- * @param array $meta
- *
+ * @param array $meta An array of attachment meta data.
  * @return array
  */
-function sfp_generate_metadata( array $meta ): array {
+function sfp_generate_metadata( $meta ) {
 	global $dynimg_image_sizes;
 
 	if ( ! is_array( $dynimg_image_sizes ) ) {
@@ -286,17 +272,15 @@ function sfp_generate_metadata( array $meta ): array {
 /**
  * Get the relative file path by stripping out the /wp-content/uploads/ business.
  *
- * @return string  The relative path.
+ * @return string The relative path.
  */
-function sfp_get_relative_path(): string {
+function sfp_get_relative_path() {
 	static $path;
 	if ( ! $path ) {
 		$path = preg_replace( '/.*\/wp\-content\/uploads(\/sites\/\d+)?\//i', '', $_SERVER['REQUEST_URI'] );
 	}
 	/**
-	 * Filter: sfp_relative_path
-	 *
-	 * Alter the relative path of an image in SFP.
+	 * Filters the relative path of an image in SFP.
 	 *
 	 * @param string $path The relative path of the file.
 	 */
@@ -307,11 +291,9 @@ function sfp_get_relative_path(): string {
 /**
  * Grab a random file from a local directory and return the path.
  *
- * @param bool $doing_resize
- *
  * @return string The local path to the file.
  */
-function sfp_get_random_local_file_path( bool $doing_resize ): string {
+function sfp_get_random_local_file_path(): string {
 	static $local_dir;
 	$transient_key = 'sfp-replacement-images';
 	if ( ! $local_dir ) {
@@ -339,16 +321,11 @@ function sfp_get_random_local_file_path( bool $doing_resize ): string {
 }
 
 /**
- * Retrieve the saved mode.SFP can operate in five modes:
- *   'download'    Download the remote image to your machine
- *   'header'      Serve the remote file directly without downloading
- *   'local'       Not sure, but it looks like it uses a local file if the remote get fails
- *   'photon'      Not sure, but looks like it uses the photos service to dynamically get images at a specific size
- *   'lorempixel'  Not sure
+ * Retrieve the saved mode. See the README for the available modes.
  *
- * @return string The saved mode. Default is 'header'
+ * @return string The saved mode. Default is 'header'.
  */
-function sfp_get_mode(): string {
+function sfp_get_mode() {
 	static $mode;
 	if ( ! $mode ) {
 		$mode = get_option( 'sfp_mode' );
@@ -364,7 +341,7 @@ function sfp_get_mode(): string {
  *
  * @return string
  */
-function sfp_get_base_url(): string {
+function sfp_get_base_url() {
 	static $url;
 	$mode = sfp_get_mode();
 	if ( ! $url ) {
@@ -380,5 +357,5 @@ function sfp_get_base_url(): string {
  * Die with an error.
  */
 function sfp_error() {
-	die( 'SFP tried to load, but encountered an error' );
+	die( 'SFP tried to load but encountered an error' );
 }
